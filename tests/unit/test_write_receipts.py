@@ -106,7 +106,9 @@ async def test_update_todo_preserves_failure_without_readback() -> None:
 
     async with Client(server.mcp) as client:
         result = await client.call_tool(
-            "update_todo", {"id": TODO_ID, "title": "Updated title"}
+            "update_todo",
+            {"id": TODO_ID, "title": "Updated title"},
+            raise_on_error=False,
         )
 
     assert result.structured_content == failure
@@ -129,6 +131,7 @@ async def test_move_record_preserves_failure_without_readback() -> None:
         result = await client.call_tool(
             "move_record",
             {"todo_id": TODO_ID, "destination_list": "today"},
+            raise_on_error=False,
         )
 
     assert result.structured_content == failure

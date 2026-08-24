@@ -38,7 +38,7 @@ def _server_with_mock_tools() -> ThingsMCPServer:
 
 
 @pytest.mark.asyncio
-async def test_update_todo_returns_target_id_and_final_item() -> None:
+async def test_update_todo_returns_target_id_and_post_write_readback() -> None:
     server = _server_with_mock_tools()
 
     async with Client(server.mcp) as client:
@@ -50,7 +50,7 @@ async def test_update_todo_returns_target_id_and_final_item() -> None:
         "success": True,
         "message": "Todo updated successfully",
         "todo_id": TODO_ID,
-        "verified": True,
+        "readback_succeeded": True,
         "item": UPDATED_TODO,
     }
     server.tools.update_todo.assert_awaited_once_with(
@@ -70,7 +70,7 @@ async def test_update_todo_returns_target_id_and_final_item() -> None:
 
 
 @pytest.mark.asyncio
-async def test_move_record_returns_target_id_and_final_item() -> None:
+async def test_move_record_returns_target_id_and_post_write_readback() -> None:
     server = _server_with_mock_tools()
 
     async with Client(server.mcp) as client:
@@ -84,7 +84,7 @@ async def test_move_record_returns_target_id_and_final_item() -> None:
         "message": "Todo moved successfully",
         "todo_id": TODO_ID,
         "destination": "today",
-        "verified": True,
+        "readback_succeeded": True,
         "item": UPDATED_TODO,
     }
     server.tools.move_record.assert_awaited_once_with(
@@ -149,22 +149,22 @@ async def test_update_todo_readback_exception_keeps_write_success_explicit() -> 
         "success": True,
         "message": "Todo updated successfully",
         "todo_id": TODO_ID,
-        "verified": False,
-        "verification_error": {
+        "readback_succeeded": False,
+        "readback_error": {
             "success": False,
             "error": "readback_failed",
-            "message": "Final item readback failed.",
+            "message": "Post-write item readback failed.",
             "details": "database unavailable",
         },
         "warnings": [
-            "Write succeeded, but final item state could not be verified; "
-            "do not retry automatically."
+            "Write reported success, but post-write readback failed; "
+            "do not retry the write automatically."
         ],
     }
 
 
 @pytest.mark.asyncio
-async def test_move_record_structured_readback_error_is_verification_failure() -> None:
+async def test_move_record_surfaces_structured_readback_failure() -> None:
     server = _server_with_mock_tools()
     readback_error = {
         "success": False,
@@ -184,10 +184,10 @@ async def test_move_record_structured_readback_error_is_verification_failure() -
         "message": "Todo moved successfully",
         "todo_id": TODO_ID,
         "destination": "today",
-        "verified": False,
-        "verification_error": readback_error,
+        "readback_succeeded": False,
+        "readback_error": readback_error,
         "warnings": [
-            "Write succeeded, but final item state could not be verified; "
-            "do not retry automatically."
+            "Write reported success, but post-write readback failed; "
+            "do not retry the write automatically."
         ],
     }

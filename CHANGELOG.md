@@ -69,6 +69,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - **Successful `update_todo` and `move_record` calls now return write receipts** containing the stable target `todo_id`, an explicit `readback_succeeded` state, and, when the read succeeds, an observed `item` snapshot in the same shape as `get_todo_by_id`. A successful readback does not claim the requested fields or destination were applied. If readback fails after the write reports success, the response keeps `success: true`, sets `readback_succeeded: false`, and includes `readback_error` plus a no-auto-retry warning. Structured write failures are returned unchanged and do not trigger a readback.
 
+### Fixed
+- **Server disconnects now stop the operation queue on its owning event loop.** Queue cleanup runs in FastMCP's lifespan teardown, before the event loop closes, instead of attempting async cleanup later from synchronous `stop`, signal, or `atexit` handlers.
+
 ## [1.7.0] - 2026-08-19
 
 This release closes out two user-reported issues: [#9](https://github.com/ebowman/mcp-server-things/issues/9)

@@ -74,6 +74,25 @@ def pytest_collection_modifyitems(config, items):
             item.add_marker(skip_marker)
 
 
+@pytest.fixture(scope="session", autouse=True)
+def scoped_things_reads():
+    """Use the same picker-scoped database for direct things.py test reads."""
+    if not os.environ.get("THINGS_MCP_SCOPED_HELPER_APP"):
+        yield
+        return
+
+    import things.api
+    from things_mcp.scoped_database import ScopedDatabase
+
+    ScopedDatabase().execute_query("SELECT COUNT(*) FROM TMTask")
+    original = things.api.Database
+    things.api.Database = ScopedDatabase
+    try:
+        yield
+    finally:
+        things.api.Database = original
+
+
 @pytest.fixture(scope="session")
 def live_things_tools():
     """A real ThingsTools backed by a real AppleScriptManager.
@@ -153,6 +172,8 @@ def smoke_session(request, live_things_tools):
     result = asyncio.run(_create())
     assert result.get("success"), f"Failed to create smoke project: {result}"
     project_id = result["project_id"]
+    session = _SmokeSession(project_id, project_name, None)
+    request.addfinalizer(lambda: _trash_and_verify(session))
 
     # Verify the heading was really created (rather than trusting
     # add_project's response blindly) via a fresh things.py read - this is
@@ -165,7 +186,7 @@ def smoke_session(request, live_things_tools):
     ]
     resolved_heading_title = heading_title if headings else None
 
-    session = _SmokeSession(project_id, project_name, resolved_heading_title)
+    session.heading_title = resolved_heading_title
 
     # Track every to-do the seed payload actually produced (not just ones
     # matching an expected title - defensive in case a future Things
@@ -178,10 +199,6 @@ def smoke_session(request, live_things_tools):
     for t in things.tasks(project=project_id, type="to-do") or []:
         session.track(t["uuid"])
 
-    def _teardown():
-        _trash_and_verify(session)
-
-    request.addfinalizer(_teardown)
     return session
 
 

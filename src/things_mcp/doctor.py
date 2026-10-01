@@ -3,8 +3,8 @@
 This module implements a set of read-only diagnostic checks that verify the
 local environment is correctly set up to run the Things 3 MCP server:
 Things 3 installation, the app being running, macOS Automation (TCC)
-permission, SQLite database readability (a separate TCC permission - Full
-Disk Access), presence of ``uv``/``uvx`` on ``PATH``, whether the running
+permission, SQLite database readability (via scoped helper or Full Disk
+Access), presence of ``uv``/``uvx`` on ``PATH``, whether the running
 Python interpreter's architecture matches the host CPU (Rosetta detection),
 the optional Things URL-scheme auth token, and basic environment/version
 information.
@@ -20,6 +20,7 @@ checks, rendering the table, and choosing the process exit code.
 
 from __future__ import annotations
 
+import os
 import platform
 import shutil
 import subprocess
@@ -51,8 +52,8 @@ _APP_NOT_RUNNING_MARKERS = (
 _DB_UNREADABLE_MARKER = "unable to open database file"
 
 _TCC_HINT = (
-    "Grant Full Disk Access to the process launching the server, or run the "
-    "server via HTTP transport from Terminal - see README Troubleshooting "
+    "Use the scoped database helper, grant Full Disk Access to the process "
+    "launching the server, or run via HTTP from Terminal - see README Troubleshooting "
     "'Reads fail but writes work'."
 )
 
@@ -236,9 +237,9 @@ def check_database_readable(timeout: float = _DB_READ_TIMEOUT_SECS) -> CheckResu
 
     def _target():
         try:
-            from .things_import import get_things
+            from .things_import import LazyThingsProxy
 
-            things_mod = get_things()
+            things_mod = LazyThingsProxy()
             todos = things_mod.todos(status="incomplete")
             result_holder["count"] = len(todos)
         except Exception as e:  # noqa: BLE001 - surfaced to caller via result_holder
@@ -263,6 +264,13 @@ def check_database_readable(timeout: float = _DB_READ_TIMEOUT_SECS) -> CheckResu
     if "error" in result_holder:
         error = result_holder["error"]
         message = str(error)
+        if os.environ.get("THINGS_MCP_SCOPED_HELPER_APP"):
+            return CheckResult(
+                name,
+                STATUS_FAIL,
+                detail=message,
+                hint="Build the scoped helper, grant the Things database in its picker, then re-run doctor.",
+            )
         if _DB_UNREADABLE_MARKER in message.lower():
             return CheckResult(
                 name,

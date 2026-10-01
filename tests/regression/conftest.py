@@ -30,7 +30,7 @@ import asyncio
 import os
 import subprocess
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set
 
 import pytest
 
@@ -88,6 +88,25 @@ def pytest_collection_modifyitems(config, items):
             item.add_marker(pytest.mark.live)
             if skip_marker is not None:
                 item.add_marker(skip_marker)
+
+
+@pytest.fixture(scope="session", autouse=True)
+def scoped_things_reads():
+    """Use the same picker-scoped database for direct things.py test reads."""
+    if not os.environ.get("THINGS_MCP_SCOPED_HELPER_APP"):
+        yield
+        return
+
+    import things.api
+    from things_mcp.scoped_database import ScopedDatabase
+
+    ScopedDatabase().execute_query("SELECT COUNT(*) FROM TMTask")
+    original = things.api.Database
+    things.api.Database = ScopedDatabase
+    try:
+        yield
+    finally:
+        things.api.Database = original
 
 
 # ---------------------------------------------------------------------------
@@ -295,6 +314,7 @@ class Sandbox:
 
         self.tag_name: Optional[str] = None
         self.tag_id: Optional[str] = None
+        self.tag_existing_ids: Optional[Set[str]] = None
         self.tag_created_via: Optional[str] = None  # 'create_tag' or 'applescript'
 
         self.tracked_todo_ids: List[str] = []
@@ -332,6 +352,7 @@ def sandbox(request, live_server, mcp):
     area_result = asyncio.run(mcp.call("add_area", title=session.area_title))
     assert area_result.get("success"), f"Failed to create sandbox area: {area_result}"
     session.area_id = area_result["area_id"]
+    request.addfinalizer(lambda: _teardown_sandbox(session))
 
     # (b) seeded project (with a real heading + one seed todo) inside the area
     session.project_title = sandbox_title("project")
@@ -376,6 +397,7 @@ def sandbox(request, live_server, mcp):
 
     # (d) tag - via create_tag if ai_can_create_tags, else AppleScript fallback
     session.tag_name = f"hq-gbl-reg-tag-{ts()}"
+    session.tag_existing_ids = {t["uuid"] for t in things.tags() or []}
     if live_server.config.ai_can_create_tags:
         tag_result = asyncio.run(mcp.call("create_tag", tag_name=session.tag_name))
         assert tag_result.get("success"), f"Failed to create sandbox tag: {tag_result}"
@@ -391,7 +413,10 @@ def sandbox(request, live_server, mcp):
         session.tag_created_via = "applescript"
     # Resolve the tag's uuid via things.py for teardown/verification.
     time.sleep(0.5)
-    matching_tags = [t for t in things.tags() or [] if t.get("title") == session.tag_name]
+    matching_tags = [
+        t for t in things.tags() or []
+        if t.get("title") == session.tag_name and t["uuid"] not in session.tag_existing_ids
+    ]
     session.tag_id = matching_tags[0]["uuid"] if matching_tags else None
 
     # (e) completed project (for TARGET_COMPLETED tests)
@@ -414,10 +439,6 @@ def sandbox(request, live_server, mcp):
         f"Failed to mark sandbox done project completed: {complete_result}"
     )
 
-    def _teardown():
-        _teardown_sandbox(session)
-
-    request.addfinalizer(_teardown)
     return session
 
 
@@ -515,14 +536,19 @@ def _teardown_sandbox(session: Sandbox) -> None:
     all_todo_ids = still_todo_ids
     all_heading_ids = list(dict.fromkeys(child_heading_ids + tracked_heading_ids))
 
-    # 1. Tag delete first - cheap, no cascade risk.
-    if session.tag_id:
-        _delete_tag_via_applescript(session.tag_id)
-    elif session.tag_name:
-        # Fall back to a fresh uuid lookup if it wasn't resolved earlier.
-        matching = [t for t in things.tags() or [] if t.get("title") == session.tag_name]
-        if matching:
-            _delete_tag_via_applescript(matching[0]["uuid"])
+    # 1. Delete only tags absent before this setup began, even if creation
+    # returned success for an existing name or setup failed during readback.
+    tag_ids: List[str] = []
+    if session.tag_name and session.tag_existing_ids is not None:
+        tag_ids = [
+            t["uuid"] for t in things.tags() or []
+            if t.get("title") == session.tag_name
+            and t["uuid"] not in session.tag_existing_ids
+        ]
+        if session.tag_id and session.tag_id not in tag_ids:
+            tag_ids.append(session.tag_id)
+    for tag_id in tag_ids:
+        _delete_tag_via_applescript(tag_id)
 
     # 2. Trash every to-do (including ones swept up above), before their
     #    parent projects, so `delete (to do id ...)` doesn't hit the
@@ -597,16 +623,12 @@ def _teardown_sandbox(session: Sandbox) -> None:
         if area_record is not None or still_listed:
             leftovers.append(f"extra area {area_id} still present")
 
-    # Verify tag: same bare-get quirk; must be gone from things.tags().
-    if session.tag_id:
-        tag_record = things.get(session.tag_id)
-        still_listed = any(t["uuid"] == session.tag_id for t in things.tags() or [])
+    # Verify each newly created tag by id; same-title older tags are untouched.
+    for tag_id in tag_ids:
+        tag_record = things.get(tag_id)
+        still_listed = any(t["uuid"] == tag_id for t in things.tags() or [])
         if tag_record is not None or still_listed:
-            leftovers.append(f"tag {session.tag_id} still present: {session.tag_name!r}")
-    elif session.tag_name:
-        still_listed = any(t["title"] == session.tag_name for t in things.tags() or [])
-        if still_listed:
-            leftovers.append(f"tag (unresolved id) still present: {session.tag_name!r}")
+            leftovers.append(f"tag {tag_id} still present: {session.tag_name!r}")
 
     if leftovers:
         raise AssertionError(
@@ -649,7 +671,7 @@ def _snapshot_db() -> Dict[str, Dict[str, Any]]:
 
 
 @pytest.fixture(scope="session", autouse=True)
-def _collateral_guard(request):
+def _collateral_guard(request, scoped_things_reads):
     """Session-scoped, autouse: snapshots the whole database BEFORE any
     sandbox object is created (so sandbox ids are excluded as 'new' and
     never checked) and asserts, after ALL teardown has run, that no
@@ -672,42 +694,30 @@ def _collateral_guard(request):
     """
     skip_reason_env = os.environ.get("THINGS_MCP_REG_SKIP_COLLATERAL_GUARD") == "1"
 
-    try:
-        before = _snapshot_db()
-    except Exception:
-        # things.py unavailable at this point (e.g. DB unreadable) - nothing
-        # to compare; let tests proceed, they'll fail on their own if things
-        # is really broken.
-        before = None
+    before = _snapshot_db()
 
     def _check():
-        if before is None:
-            return
-        try:
-            after = _snapshot_db()
-        except Exception:
-            return
+        after = _snapshot_db()
 
         offenders = []
         for uuid, before_row in before.items():
             after_row = after.get(uuid)
             if after_row is None:
                 offenders.append(
-                    f"{before_row['kind']} {uuid} ({before_row.get('title')!r}) disappeared"
+                    f"{before_row['kind']} {uuid} disappeared"
                 )
                 continue
             if before_row["kind"] == "task":
                 if after_row.get("modified") != before_row.get("modified"):
                     offenders.append(
-                        f"task {uuid} ({before_row.get('title')!r}) 'modified' changed: "
+                        f"task {uuid} 'modified' changed: "
                         f"{before_row.get('modified')!r} -> {after_row.get('modified')!r}"
                     )
             else:
                 # area/tag: no modified-style key - assert title unchanged.
                 if after_row.get("title") != before_row.get("title"):
                     offenders.append(
-                        f"{before_row['kind']} {uuid} title changed: "
-                        f"{before_row.get('title')!r} -> {after_row.get('title')!r}"
+                        f"{before_row['kind']} {uuid} title changed"
                     )
 
         if offenders:

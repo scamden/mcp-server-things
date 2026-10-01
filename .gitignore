@@ -81,3 +81,4 @@ CLAUDE.md.bak.*
 
 # Beads proxied DB (local)
 .beads/proxieddb/
+.beads/.auto-import-issues.jsonl

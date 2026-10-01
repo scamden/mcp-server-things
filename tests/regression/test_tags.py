@@ -408,32 +408,22 @@ class TestCreateTag:
         ),
     )
     def test_whitespace_only_name_rejected(self, monkeypatch, sandbox):
+        import things
+
+        existing_tag_ids = {t["uuid"] for t in things.tags() or []}
         server, mcp2 = _second_server(monkeypatch, ai_can_create_tags=True)
-        result = mcp2.call_sync("create_tag", tag_name="   ")
         try:
+            result = mcp2.call_sync("create_tag", tag_name="   ")
             assert result.get("success") is False, result
         finally:
-            # Whitespace-only names are silently trimmed to '' by Things
-            # (see xfail reason) - clean up any blank-titled tag directly by
-            # uuid rather than by name (an empty name doesn't route through
-            # _delete_tag_by_name's title lookup cleanly).
-            import things
+            # Only remove a blank tag created during this test; a user may
+            # already have one with the same empty title.
+            from regression.conftest import _delete_tag_via_applescript
 
             for t in things.tags() or []:
-                if not (t.get("title") or "").strip():
-                    escaped = t["uuid"].replace('"', '\\"')
-                    import subprocess
-
-                    subprocess.run(
-                        [
-                            "osascript",
-                            "-e",
-                            f'tell application "Things3" to delete (tag id "{escaped}")',
-                        ],
-                        capture_output=True,
-                        text=True,
-                        timeout=15,
-                    )
+                if t["uuid"] in existing_tag_ids or (t.get("title") or "").strip():
+                    continue
+                _delete_tag_via_applescript(t["uuid"])
 
     def test_restricted_when_ai_cannot_create_tags(self, monkeypatch, sandbox):
         server, mcp2 = _second_server(monkeypatch, ai_can_create_tags=False)

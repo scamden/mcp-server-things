@@ -612,7 +612,7 @@ PARAM_ASSERTIONS: Dict[Tuple[str, str], Dict[str, Any]] = {
     },
     ("add_project", "todos"): {
         "build": lambda s: f"{s}\nSecond todo",
-        "check": _property_value_check("make new to do in newProject"),
+        "check": _property_value_check("project:newProject"),
     },
 
     # --- update_project ---
@@ -885,4 +885,3 @@ def test_parameter_reaches_backend(tool: str, param: str):
         f"Captured scripts:\n{fake.all_scripts_text()}\n"
         f"Captured URL calls: {fake.url_scheme_calls}"
     )
-

@@ -917,23 +917,24 @@ class TestGetAreas:
 
 class TestGetProjects:
     def test_sandbox_projects_present_every_mode_with_area(self, mcp, sandbox):
-        # 'summary' mode returns only a small preview (not the full list -
-        # CLAUDE.md's "Structured Output" section), so a specific item is
-        # not guaranteed to be present there. 'detailed' can also be
-        # truncated on this live DB's real project count (>context budget
-        # -> _handle_oversized_response), observed live, so only
-        # minimal/standard (whose smaller per-item size keeps this
-        # environment's full project set under the size budget) are
-        # checked for presence here.
+        # A mode may exceed the context budget as the live database grows.
+        # Only a complete response guarantees that a specific project is
+        # present; truncated responses must advertise their missing items.
+        checked_full_response = False
         for mode in ("minimal", "standard"):
             result = mcp.call_sync("get_projects", mode=mode)
             items = result.get("items") or []
             by_uuid = {item["uuid"]: item for item in items}
+            if result.get("meta", {}).get("truncated"):
+                assert result["total"] > result["count"], mode
+                continue
+            checked_full_response = True
             assert sandbox.project_id in by_uuid, f"mode={mode}: sandbox project not found"
             assert by_uuid[sandbox.project_id].get("area") == sandbox.area_id, (
                 mode,
                 by_uuid[sandbox.project_id],
             )
+        assert checked_full_response, "both project modes were truncated"
 
     def test_include_items_nests_todos_scoped_read(self, mcp, sandbox):
         """get_projects(include_items=true) is documented as

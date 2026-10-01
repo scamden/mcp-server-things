@@ -80,6 +80,19 @@ def fast_polling(monkeypatch):
 
 class TestAppleScriptPathCountVerification:
     @pytest.mark.asyncio
+    async def test_plain_todos_are_created_with_project_property(self):
+        manager = make_applescript_manager(
+            execute_applescript_return={"success": True, "output": "PROJECT-1\n2"}
+        )
+        ops = TodoOperations(manager, Mock())
+
+        await ops.add_project("My Project", todos="Line A\nLine B")
+
+        script = manager.execute_applescript.await_args.args[0]
+        assert script.count("project:newProject") == 2
+        assert "make new to do in newProject" not in script
+
+    @pytest.mark.asyncio
     async def test_all_requested_todos_created_reports_count_no_warning(self):
         manager = make_applescript_manager(
             execute_applescript_return={"success": True, "output": "PROJECT-1\n3"}

@@ -423,6 +423,32 @@ actually needs fixing). Use `mcp-server-things doctor --json` for
 machine-readable output, or `python -m things_mcp doctor` if you're running
 from source.
 
+### Scoped database access on macOS
+
+From a source checkout, build the signed, sandboxed read helper and select the
+`Things Database.thingsdatabase` bundle in its picker:
+
+```bash
+THINGS_MCP_SCOPED_BUILD_DIR="$HOME/Applications" sh native/build.sh
+open -n -W "$HOME/Applications/ThingsReadHelper.app" --args select
+export THINGS_MCP_SCOPED_HELPER_APP="$HOME/Applications/ThingsReadHelper.app"
+PYTHONPATH=src python -m things_mcp doctor
+```
+
+Use a local directory for the built app. iCloud and other File Provider
+folders can attach Finder metadata that invalidates its code signature.
+The picker starts in the Things Group Container. Open the `ThingsData-*`
+folder and choose `Things Database.thingsdatabase` as one package. Re-select it
+after rebuilding the helper if the saved grant no longer works. Give the same
+`THINGS_MCP_SCOPED_HELPER_APP` value to the connector process. This grants the
+helper read-only access to that bundle without giving the connector host Full
+Disk Access. The helper allows the task, project, area, tag, and checklist
+tables used by read tools. It denies writes, schema inspection, and the
+`TMSettings` table containing the Things URL auth token. Writes still use
+Things' AppleScript or URL scheme permissions. To revoke this saved grant,
+run `open -n -W "$THINGS_MCP_SCOPED_HELPER_APP" --args clear` and remove the helper's
+access in macOS Privacy & Security if it appears there.
+
 ### Reads fail but writes work ("unable to open database file")
 
 | Operation | Result |

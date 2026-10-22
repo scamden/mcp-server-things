@@ -140,6 +140,25 @@ class TestDateScheduling:
 
         # Should fall back to list assignment
         assert result['success']
+        assert result['date_set'] == 'Someday'
+
+    @pytest.mark.asyncio
+    async def test_schedule_anytime_falls_back_to_anytime_list(
+        self, scheduler, mock_applescript_manager
+    ):
+        async def execute(script):
+            if 'move theTodo to list' in script:
+                return {'success': True, 'output': 'moved_to_list'}
+            return {'success': False, 'output': 'invalid date'}
+
+        mock_applescript_manager.execute_applescript.side_effect = execute
+
+        result = await scheduler.schedule_todo_reliable('test-id', 'anytime')
+
+        assert result['success'] is True
+        assert result['date_set'] == 'Anytime'
+        script = mock_applescript_manager.execute_applescript.await_args.args[0]
+        assert 'move theTodo to list "Anytime"' in script
 
 
 # ============================================================================

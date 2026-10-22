@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - `get_areas(mode='summary')` now returns every area as an `{id, name}` entry in `areas` and `items`, using the real Things `uuid` and `title` fields. Previously it returned up to ten blank names and no IDs.
+- **`when='anytime'` now moves tasks and projects to Anytime** instead of Someday when the AppleScript scheduler uses its list fallback. This affects create, update, and bulk update calls.
 
 ## [1.7.0] - 2026-08-19
 

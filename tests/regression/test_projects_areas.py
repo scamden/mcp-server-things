@@ -32,15 +32,12 @@ Error-code notes (confirmed by reading source, not assumed):
     substring match), VALIDATION_ERROR (title='') - all confirmed in
     tools_helpers/write_operations.py's update_area().
 
-Known live quirks (documented, not fixed here - see CLAUDE.md /
+Known live quirk (documented, not fixed here - see CLAUDE.md /
 tests/regression/test_update_todo.py's own notes): when='today' via the
 AppleScript scheduler leaves start='Someday' with start_date=today rather
-than start='Anytime' (bead hq-x9z); when='anytime' lands start='Someday'
-instead of 'Anytime' (bead hq-z5d). Both apply to update_project's `when`
-path too (shared scheduler), asserted here as xfail(strict=True) citing the
-same beads where the AppleScript scheduler is used, or verified via
-things.py start_date and list-membership predicates matching
-test_update_todo.py's approach.
+than start='Anytime' (bead hq-x9z). This also applies to update_project's
+`when` path (shared scheduler), asserted here as xfail(strict=True) or
+verified via things.py start_date and list-membership predicates.
 """
 import time
 
@@ -552,21 +549,6 @@ class TestUpdateProjectMoves:
             found = _in_today_list()
         assert found, "expected project to appear in get_today(include_projects=True)"
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason=(
-            "observed (bead hq-z5d): update_project(when='anytime') shares "
-            "scheduling.helpers.determine_target_list(), which maps the "
-            "literal string 'anytime' to the same Someday-list AppleScript "
-            "fallback as 'someday' - the project ends up with "
-            "start='Someday', indistinguishable from a native "
-            "when='someday' update, so it is a member of "
-            "get_someday(include_project_tasks=...) rather than "
-            "get_anytime(include_projects=True). This test encodes the "
-            "documented behavior (should land in Anytime) and is expected "
-            "to fail until hq-z5d is fixed."
-        ),
-    )
     def test_when_anytime_visible_via_get_anytime_include_projects(self, mcp, sandbox):
         project_id, _, _ = _new_project(mcp, sandbox)
         result = mcp.call_sync("update_project", id=project_id, when="anytime")

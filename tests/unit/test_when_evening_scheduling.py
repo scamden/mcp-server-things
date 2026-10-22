@@ -230,6 +230,24 @@ class TestUpdateTodoEveningWithToken:
         assert params["when"] == "evening"
 
 
+class TestUpdateTodoScheduleFailure:
+    @pytest.mark.asyncio
+    async def test_update_reports_unconfirmed_schedule(self, ops, mock_applescript_manager):
+        mock_applescript_manager.execute_applescript.return_value = {
+            "success": True, "output": "updated"
+        }
+        ops.scheduler.schedule_todo_reliable = AsyncMock(return_value={
+            "success": False,
+            "error": "OUTCOME_UNCONFIRMED",
+            "details": "Invalid date and time date someday",
+        })
+
+        result = await ops.update_todo("abc123", when="someday")
+
+        assert result["success"] is False
+        assert result["error"] == "OUTCOME_UNCONFIRMED"
+
+
 class TestUpdateTodoEveningNoToken:
     @pytest.mark.asyncio
     async def test_update_todo_evening_without_token_returns_structured_error(

@@ -37,6 +37,16 @@ class SchedulingStrategies:
             Dict with success status and method used
         """
 
+        if when_date.lower().strip() in {"someday", "anytime"}:
+            result = await self._schedule_list_fallback(todo_id, when_date)
+            if result.get("error") == "OUTCOME_UNCONFIRMED":
+                return result
+            return {
+                "success": result["success"],
+                "method": "list_fallback",
+                "date_set": result.get("list_assigned", when_date),
+            }
+
         # Strategy 1: Try relative date commands (highest reliability)
         if when_date.lower() in ["today", "tomorrow", "yesterday"]:
             result = await self._schedule_relative_date(todo_id, when_date.lower())

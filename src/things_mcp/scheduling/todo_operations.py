@@ -1472,6 +1472,8 @@ class TodoOperations:
             # mechanism for it).
             if when and not when_is_evening:
                 schedule_result = await self.scheduler.schedule_todo_reliable(todo_id, when)
+                if not schedule_result.get("success"):
+                    return schedule_result
                 response = {
                     "success": True,
                     "message": "Todo updated and scheduled successfully",

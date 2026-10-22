@@ -141,6 +141,8 @@ class TestDateScheduling:
         # Should fall back to list assignment
         assert result['success']
         assert result['date_set'] == 'Someday'
+        mock_applescript_manager.execute_applescript.assert_awaited_once()
+        assert 'move theTodo to list "Someday"' in mock_applescript_manager.execute_applescript.await_args.args[0]
 
     @pytest.mark.asyncio
     async def test_schedule_anytime_falls_back_to_anytime_list(
@@ -157,6 +159,7 @@ class TestDateScheduling:
 
         assert result['success'] is True
         assert result['date_set'] == 'Anytime'
+        mock_applescript_manager.execute_applescript.assert_awaited_once()
         script = mock_applescript_manager.execute_applescript.await_args.args[0]
         assert 'move theTodo to list "Anytime"' in script
 

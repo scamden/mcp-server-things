@@ -166,6 +166,8 @@ class RecordingAppleScriptManager:
                 "output": "id123, Some title, some notes, open, inbox",
             }
 
+        if 'return "moved_to_list"' in script:
+            return {"success": True, "output": "moved_to_list"}
         if "move theTodo to list" in script or "set project of theTodo to" in script or "set area of theTodo to" in script:
             return {"success": True, "output": "MOVED to destination"}
 
@@ -178,6 +180,8 @@ class RecordingAppleScriptManager:
         if "delete targetTodo" in script:
             return {"success": True, "output": "deleted"}
 
+        if 'return "scheduled_objects"' in script:
+            return {"success": True, "output": "scheduled_objects"}
         if "scheduled_relative" in script or "targetDate" in script:
             return {"success": True, "output": "scheduled_relative"}
 

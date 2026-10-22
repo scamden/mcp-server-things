@@ -100,7 +100,8 @@ class AppleScriptManager:
         """Check if Things 3 is currently running."""
         return await self.executor.is_things_running()
 
-    async def execute_applescript(self, script: str, cache_key: Optional[str] = None) -> Dict[str, Any]:
+    async def execute_applescript(self, script: str, cache_key: Optional[str] = None,
+                                  retry_safe: bool = False) -> Dict[str, Any]:
         """Execute an AppleScript command.
 
         Args:
@@ -110,7 +111,7 @@ class AppleScriptManager:
         Returns:
             Dict with success status, output, and error information
         """
-        return await self.executor.execute_script(script)
+        return await self.executor.execute_script(script, retry_safe=retry_safe)
 
     async def execute_url_scheme(self, action: str, parameters: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Execute a Things URL scheme command.
@@ -161,6 +162,7 @@ class AppleScriptManager:
                 return {
                     "success": False,
                     "error": result.get("error", "Unknown error"),
+                    "details": result.get("details"),
                     "url": url
                 }
 

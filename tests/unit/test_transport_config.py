@@ -14,7 +14,7 @@ import pytest
 from pydantic import ValidationError
 
 from things_mcp.config import ThingsMCPConfig
-from things_mcp.main import ServerManager
+from things_mcp.main import ServerManager, main
 from things_mcp.server import ThingsMCPServer
 
 
@@ -130,6 +130,21 @@ class TestServerManagerCLIOverrides:
             assert mock_server.config.transport == "http"
             assert mock_server.config.host == "10.0.0.1"
             assert mock_server.config.port == 7000
+
+    def test_cli_timeout_and_retry_count_configure_active_executor(self, monkeypatch):
+        monkeypatch.setattr(
+            "sys.argv", ["mcp-server-things", "--timeout", "20", "--retry-count", "1"]
+        )
+        observed = {}
+
+        def inspect_server(server):
+            observed["timeout"] = server.applescript_manager.executor.timeout
+            observed["retry_count"] = server.applescript_manager.executor.retry_count
+
+        with patch.object(ThingsMCPServer, "run", autospec=True, side_effect=inspect_server):
+            assert main() == 0
+
+        assert observed == {"timeout": 20, "retry_count": 1}
 
 
 # ---------------------------------------------------------------------------

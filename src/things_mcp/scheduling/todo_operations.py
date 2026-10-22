@@ -385,9 +385,15 @@ class TodoOperations:
                 return _write_error(
                     "APPLESCRIPT_ERROR", "Failed to create todo", details=todo_id
                 )
+            if result.get("error") == "OUTCOME_UNCONFIRMED":
+                return _write_error(
+                    "CREATE_UNCONFIRMED",
+                    "Todo may have been created; check Things before retrying",
+                    details=result.get("details"),
+                )
             return _write_error(
                 "APPLESCRIPT_ERROR", "Failed to create todo",
-                details=result.get("output", "AppleScript execution failed"),
+                details=result.get("error", "AppleScript execution failed"),
             )
 
         except Exception as e:
@@ -738,6 +744,12 @@ class TodoOperations:
             result = await self.applescript.execute_url_scheme('add', params)
 
             if not result.get('success'):
+                if result.get('error') == 'OUTCOME_UNCONFIRMED':
+                    return _write_error(
+                        'CREATE_UNCONFIRMED',
+                        'Todo may have been created; check Things before retrying',
+                        details=result.get('details'),
+                    )
                 return _write_error(
                     "APPLESCRIPT_ERROR", "Failed to create todo via URL scheme",
                     details=result.get('error', 'Unknown error'),
@@ -1696,6 +1708,12 @@ class TodoOperations:
 
             result = await self.applescript.execute_url_scheme('json', {'data': json.dumps(payload)})
             if not result.get('success'):
+                if result.get('error') == 'OUTCOME_UNCONFIRMED':
+                    return _write_error(
+                        'CREATE_UNCONFIRMED',
+                        'Project may have been created; check Things before retrying',
+                        details=result.get('details'),
+                    )
                 return _write_error(
                     "APPLESCRIPT_ERROR", "Failed to create project via URL scheme",
                     details=result.get('error', 'Unknown error'),
@@ -1898,9 +1916,15 @@ class TodoOperations:
                 return _write_error(
                     "APPLESCRIPT_ERROR", "Failed to create project", details=project_id
                 )
+            if result.get("error") == "OUTCOME_UNCONFIRMED":
+                return _write_error(
+                    "CREATE_UNCONFIRMED",
+                    "Project may have been created; check Things before retrying",
+                    details=result.get("details"),
+                )
             return _write_error(
                 "APPLESCRIPT_ERROR", "Failed to create project",
-                details=result.get("output", "AppleScript execution failed"),
+                details=result.get("error", "AppleScript execution failed"),
             )
 
         except Exception as e:

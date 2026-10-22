@@ -330,6 +330,24 @@ class TestHeadingLinesRouteToUrlScheme:
         assert result["details"] == "boom"
 
     @pytest.mark.asyncio
+    async def test_submitted_json_create_failure_is_unconfirmed(self):
+        manager = make_applescript_manager(
+            execute_applescript_return=ids_result([]),
+            execute_url_scheme_return={
+                "success": False,
+                "error": "OUTCOME_UNCONFIRMED",
+                "details": "Script execution timed out",
+            },
+        )
+        ops = TodoOperations(manager, Mock())
+
+        result = await ops.add_project("Maybe Created", todos="##Heading 1\nTodo")
+
+        assert result["success"] is False
+        assert result["error"] == "CREATE_UNCONFIRMED"
+        manager.execute_url_scheme.assert_awaited_once()
+
+    @pytest.mark.asyncio
     async def test_lookup_timeout_returns_structured_error_not_success(self):
         manager = make_applescript_manager(
             execute_applescript_side_effect=[

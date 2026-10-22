@@ -108,7 +108,9 @@ class ServerManager:
         """
         try:
             # Create server first (it will configure logging)
-            self.server = ThingsMCPServer(env_file=env_file)
+            self.server = ThingsMCPServer(
+                env_file=env_file, timeout=timeout, retry_count=retry_count
+            )
 
             # CLI flags override env/config for transport settings
             if transport is not None:

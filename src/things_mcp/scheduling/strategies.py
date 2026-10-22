@@ -40,6 +40,8 @@ class SchedulingStrategies:
         # Strategy 1: Try relative date commands (highest reliability)
         if when_date.lower() in ["today", "tomorrow", "yesterday"]:
             result = await self._schedule_relative_date(todo_id, when_date.lower())
+            if result.get("error") == "OUTCOME_UNCONFIRMED":
+                return result
             if result["success"]:
                 return {
                     "success": True,
@@ -55,6 +57,8 @@ class SchedulingStrategies:
             # Convert to date object for the existing method
             parsed_date = date(year, month, day)
             result = await self._schedule_specific_date_objects(todo_id, parsed_date)
+            if result.get("error") == "OUTCOME_UNCONFIRMED":
+                return result
             if result["success"]:
                 return {
                     "success": True,
@@ -67,6 +71,8 @@ class SchedulingStrategies:
 
         # Strategy 3: Try direct AppleScript date string (fallback)
         result = await self._schedule_direct_applescript(todo_id, when_date)
+        if result.get("error") == "OUTCOME_UNCONFIRMED":
+            return result
         if result["success"]:
             return {
                 "success": True,
@@ -77,6 +83,8 @@ class SchedulingStrategies:
 
         # Strategy 4: Final fallback - move to appropriate list
         fallback_result = await self._schedule_list_fallback(todo_id, when_date)
+        if fallback_result.get("error") == "OUTCOME_UNCONFIRMED":
+            return fallback_result
         return {
             "success": fallback_result["success"],
             "method": "list_fallback",
@@ -117,6 +125,8 @@ class SchedulingStrategies:
         '''
 
         result = await self.applescript.execute_applescript(script)
+        if result.get("error") == "OUTCOME_UNCONFIRMED":
+            return result
         if result.get("success") and "scheduled_relative" in result.get("output", ""):
             logger.info(f"Successfully scheduled todo {todo_id} for {relative_date} via AppleScript relative date")
             return {"success": True}
@@ -150,6 +160,8 @@ class SchedulingStrategies:
         '''
 
         result = await self.applescript.execute_applescript(script)
+        if result.get("error") == "OUTCOME_UNCONFIRMED":
+            return result
         if result.get("success") and "scheduled_objects" in result.get("output", ""):
             logger.info(f"Successfully scheduled todo {todo_id} for {target_date} via AppleScript date objects")
             return {"success": True}
@@ -180,6 +192,8 @@ class SchedulingStrategies:
             '''
 
             result = await self.applescript.execute_applescript(script)
+            if result.get("error") == "OUTCOME_UNCONFIRMED":
+                return result
             if result.get("success") and "scheduled_direct" in result.get("output", ""):
                 logger.info(f"Successfully scheduled todo {todo_id} for {date_format} via direct AppleScript")
                 return {"success": True}
@@ -225,6 +239,8 @@ class SchedulingStrategies:
         '''
 
         result = await self.applescript.execute_applescript(script)
+        if result.get("error") == "OUTCOME_UNCONFIRMED":
+            return result
         if result.get("success") and "moved_to_list" in result.get("output", ""):
             logger.info(f"Successfully moved todo {todo_id} to {target_list} list as scheduling fallback")
             return {"success": True, "list_assigned": target_list}

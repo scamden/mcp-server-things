@@ -32,9 +32,11 @@ via an in-memory fastmcp.Client (no stdio, no real Things 3).
 """
 
 import re
+import asyncio
 
 import pytest
 from unittest.mock import AsyncMock, MagicMock, Mock
+from unittest.mock import patch
 
 from fastmcp import Client
 
@@ -177,6 +179,22 @@ class TestWriteToolErrorCodesAreUpperSnake:
         _assert_upper_snake_error(result.structured_content)
         assert result.structured_content["error"] == "INVALID_WHEN"
         server.tools.add_todo.assert_not_called()
+
+    @pytest.mark.parametrize("tool", ["add_todo", "add_project"])
+    @pytest.mark.asyncio
+    async def test_timed_out_create_is_not_retried(self, tool):
+        server = ThingsMCPServer(timeout=1, retry_count=3)
+        process = AsyncMock()
+        process.communicate.side_effect = asyncio.TimeoutError()
+        process.kill = Mock()
+
+        with patch("asyncio.create_subprocess_exec", return_value=process) as spawn:
+            async with Client(server.mcp) as client:
+                result = await client.call_tool(tool, {"title": "Disposable test"})
+
+        assert spawn.call_count == 1
+        assert result.structured_content["success"] is False
+        assert result.structured_content["error"] == "CREATE_UNCONFIRMED"
 
     @pytest.mark.asyncio
     async def test_add_todo_invalid_deadline(self):

@@ -96,7 +96,8 @@ class TestAppleScriptExecution:
             result = await manager_with_mocks.execute_applescript(script)
             
             assert result["success"] is False
-            assert "syntax error" in result["error"]
+            assert result["error"] == "OUTCOME_UNCONFIRMED"
+            assert "syntax error" in result["details"]
     
     @pytest.mark.asyncio
     async def test_execute_applescript_timeout(self, manager_with_mocks):
@@ -106,14 +107,16 @@ class TestAppleScriptExecution:
         with patch('asyncio.create_subprocess_exec') as mock_create:
             mock_process = AsyncMock()
             mock_process.communicate.side_effect = asyncio.TimeoutError()
-            mock_process.kill = AsyncMock()
+            mock_process.kill = MagicMock()
             mock_process.wait = AsyncMock()
             mock_create.return_value = mock_process
             
             result = await manager_with_mocks.execute_applescript(script)
             
             assert result["success"] is False
-            assert "timed out" in result["error"].lower()
+            assert result["error"] == "OUTCOME_UNCONFIRMED"
+            assert "timed out" in result["details"].lower()
+            mock_create.assert_called_once()
     
     @pytest.mark.asyncio
     async def test_execute_applescript_with_caching(self, manager_with_mocks):
@@ -220,7 +223,8 @@ class TestURLSchemeExecution:
             result = await manager_with_mocks.execute_url_scheme(action, parameters)
             
             assert result["success"] is False
-            assert "Invalid URL scheme" in result["error"]
+            assert result["error"] == "OUTCOME_UNCONFIRMED"
+            assert "Invalid URL scheme" in result["details"]
             assert "url" in result
     
     @pytest.mark.asyncio
@@ -372,7 +376,7 @@ class TestRetryLogic:
             
             mock_create.side_effect = [process1, process2]
             
-            result = await manager_with_retries.execute_applescript(script)
+            result = await manager_with_retries.execute_applescript(script, retry_safe=True)
             
             assert result["success"] is True
             assert result["output"] == "3.21.15"
@@ -393,7 +397,7 @@ class TestRetryLogic:
             mock_process.returncode = 1
             mock_create.return_value = mock_process
             
-            result = await manager_with_retries.execute_applescript(script)
+            result = await manager_with_retries.execute_applescript(script, retry_safe=True)
             
             assert result["success"] is False
             assert "Persistent error" in result["error"]
@@ -416,7 +420,7 @@ class TestRetryLogic:
             mock_process.returncode = 1
             mock_create.return_value = mock_process
             
-            await manager_with_retries.execute_applescript(script)
+            await manager_with_retries.execute_applescript(script, retry_safe=True)
             
             # Check that sleep was called with exponential backoff
             sleep_calls = [call.args[0] for call in mock_sleep.call_args_list]

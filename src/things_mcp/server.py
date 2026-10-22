@@ -126,7 +126,7 @@ def _parse_tag_list_for_update(tags: Optional[str]) -> Optional[List[str]]:
 class ThingsMCPServer:
     """Simple MCP server for Things 3 integration."""
     
-    def __init__(self, env_file: Optional[str] = None):
+    def __init__(self, env_file: Optional[str] = None, timeout: int = 45, retry_count: int = 3):
         """Initialize the Things MCP server.
         
         Args:
@@ -168,7 +168,7 @@ class ThingsMCPServer:
             # Must never affect server startup.
             pass
 
-        self.applescript_manager = AppleScriptManager()
+        self.applescript_manager = AppleScriptManager(timeout=timeout, retry_count=retry_count)
         boot_marker("applescript-manager-ready")
         self.tools = ThingsTools(self.applescript_manager, self.config)
         self.context_manager = ContextAwareResponseManager()

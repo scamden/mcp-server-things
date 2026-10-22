@@ -35,14 +35,14 @@ class AppleScriptExecutor:
         """Check if Things 3 is currently running."""
         try:
             script = 'tell application "Things3" to return true'
-            result = await self.execute_script(script)
+            result = await self.execute_script(script, retry_safe=True)
             return result.get("success", False)
         except Exception as e:
             logger.error(f"Error checking Things 3 status: {e}")
             return False
 
-    async def execute_script(self, script: str) -> Dict[str, Any]:
-        """Execute an AppleScript command with retry logic.
+    async def execute_script(self, script: str, *, retry_safe: bool = False) -> Dict[str, Any]:
+        """Execute a write once; retry only scripts explicitly known to be read-only.
 
         Args:
             script: AppleScript code to execute
@@ -50,7 +50,17 @@ class AppleScriptExecutor:
         Returns:
             Dict with success status, output, and error information
         """
-        return await self._execute_script_with_retry(script)
+        if retry_safe:
+            return await self._execute_script_with_retry(script)
+        result = await self._execute_script(script)
+        if result.get("success"):
+            return result
+        return {
+            "success": False,
+            "error": "OUTCOME_UNCONFIRMED",
+            "message": "Things may have applied this command; verify before retrying",
+            "details": result.get("error", "Unknown AppleScript error"),
+        }
 
     async def _execute_script_with_retry(self, script: str) -> Dict[str, Any]:
         """Execute script with retry logic."""

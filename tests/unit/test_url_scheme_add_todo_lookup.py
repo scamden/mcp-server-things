@@ -63,6 +63,24 @@ class TestImmediateHit:
         assert "warning" not in result
         assert "warnings" not in result
 
+    @pytest.mark.asyncio
+    async def test_submitted_url_create_failure_is_unconfirmed(self):
+        manager = make_applescript_manager(
+            [ids_result([])],
+            url_scheme_result={
+                "success": False,
+                "error": "OUTCOME_UNCONFIRMED",
+                "details": "Script execution timed out",
+            },
+        )
+        ops = TodoOperations(manager, Mock())
+
+        result = await ops._add_todo_via_url_scheme("Maybe Created")
+
+        assert result["success"] is False
+        assert result["error"] == "CREATE_UNCONFIRMED"
+        manager.execute_url_scheme.assert_awaited_once()
+
 
 class TestDelayedHit:
     @pytest.mark.asyncio

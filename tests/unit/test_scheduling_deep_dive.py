@@ -73,6 +73,21 @@ class TestDateScheduling:
     """Test date scheduling without specific times."""
 
     @pytest.mark.asyncio
+    async def test_unconfirmed_schedule_does_not_try_another_strategy(
+        self, scheduler, mock_applescript_manager
+    ):
+        mock_applescript_manager.execute_applescript.return_value = {
+            "success": False,
+            "error": "OUTCOME_UNCONFIRMED",
+            "details": "Script execution timed out",
+        }
+
+        result = await scheduler.schedule_todo_reliable("test-id", "today")
+
+        assert result["error"] == "OUTCOME_UNCONFIRMED"
+        mock_applescript_manager.execute_applescript.assert_awaited_once()
+
+    @pytest.mark.asyncio
     async def test_schedule_relative_today(self, scheduler, mock_applescript_manager):
         """Test scheduling for 'today' using relative date."""
         mock_applescript_manager.execute_applescript.return_value = {

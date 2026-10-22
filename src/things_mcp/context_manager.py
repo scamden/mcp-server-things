@@ -316,10 +316,13 @@ class ProgressiveDisclosureEngine:
     
     def _summarize_areas(self, areas: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Create area-specific summary."""
-        area_names = [area.get('name', '') for area in areas[:10]]
+        area_identities = [
+            {"id": area.get("uuid") or area.get("id"), "name": area.get("title") or area.get("name", "")}
+            for area in areas
+        ]
         
         return {
-            "areas": area_names,
+            "areas": area_identities,
             "total_areas": len(areas)
         }
     

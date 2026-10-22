@@ -128,6 +128,25 @@ class TestStructuredContentShape:
         assert len(standard_sc["items"]) == 25
 
     @pytest.mark.asyncio
+    async def test_get_areas_summary_preserves_all_area_identities(self):
+        areas = [
+            {"uuid": f"area-{i}", "title": f"Area {i}", "type": "area", "tags": []}
+            for i in range(11)
+        ]
+        server = _make_server_with_mock_tools(get_areas=areas)
+
+        async with Client(server.mcp) as client:
+            result = await client.call_tool("get_areas", {"mode": "summary"})
+
+        sc = result.structured_content
+        assert sc["total_areas"] == 11
+        assert len(sc["areas"]) == 11
+        assert sc["areas"][0] == {"id": "area-0", "name": "Area 0"}
+        assert sc["areas"][-1] == {"id": "area-10", "name": "Area 10"}
+        assert sc["items"] == sc["areas"]
+        assert sc["count"] == 11
+
+    @pytest.mark.asyncio
     async def test_get_todo_by_id_returns_single_item_shape(self):
         """Single-item read tools use {"item": {...}} instead of the items-list shape."""
         server = _make_server_with_mock_tools(get_todo_by_id=SAMPLE_TODO)

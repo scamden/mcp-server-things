@@ -2482,6 +2482,7 @@ class ThingsMCPServer:
             preview = (
                 result.get("recent_preview")
                 or result.get("recent_projects")
+                or result.get("areas")
                 or result.get("tags")
                 or result.get("top")
                 or []
